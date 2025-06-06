@@ -1,4 +1,4 @@
--- startup.lua  版本2025/6/5 10:50
+-- startup.lua  版本2025/6/6 9:28
 -- 转速控制器
 local speedcontroller = peripheral.find("Create_RotationSpeedController")
 if not speedcontroller then
