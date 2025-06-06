@@ -1,4 +1,4 @@
--- startup.lua  版本2025/6/6 9:28
+-- startup.lua  版本2025/6/6 16:00
 -- 转速控制器
 local speedcontroller = peripheral.find("Create_RotationSpeedController")
 if not speedcontroller then
@@ -38,15 +38,34 @@ gearbox_type = 2
 -- 0 = MT
 -- 1 = auto_snug
 -- 2 = auto_sports
+-- 3 = auto_overload
 
 -- 初始化引擎
-local engine_speed = 10 -- 启动转速
+local engine_speed = 0 -- 启动转速
 local maxSpeed = 80 -- 最大转速
 local acceleration = 3 -- 加速率
 local deceleration = 2 -- 减速率
 throttle = 0.0 -- 油门
-local load = 0 -- 负载(负载=车重*变速箱档位)
-local mass = 0.6 -- 车重(负载基数)
+local load = 0 -- 负载(负载=车重*一个很迷的数？)
+mass = 0.6 -- 车重(负载基数)
+
+startup = 1.5
+
+-- startengine
+function startengine()
+    if startup > 1 then
+        startup = math.max((startup - 0.05),1)
+        engine_speed = math.min((engine_speed + 5),30)
+        speaker.playNote("didgeridoo",(math.max(engine_speed / 26, 0.5)),(engine_speed / 8))
+        speaker.playNote("bass",(math.max(engine_speed / 26, 0.5)),(engine_speed / 5))
+        os.sleep(0.15)
+    elseif startup == 1 and startup > 0.9 then
+        speaker.playNote("didgeridoo",(math.max(engine_speed / 26, 1)),(engine_speed / 8))
+        
+        engine_speed = 30
+        startup = 0.9
+    end
+end
 
 -- HUD
 function hud(speed,gear,rpm,relspeed)
@@ -60,7 +79,7 @@ function hud_0(speed,gear,rpm,relspeed)
     monitor.setTextScale(0.5)
     monitor.setCursorPos(1,1)
     local speedstr = tostring(math.floor(relspeed * 3.6))  --0.987 math.floor(relspeed * 3.6) (speed * 0.987)
-    local rpmstr = ((math.min((math.floor(engine_speed)+4),100)) / 10) -- 转速=1000*rpmstr
+    local rpmstr = (math.max((math.min((math.floor(engine_speed)+4),100)),0) / 10) -- 转速=1000*rpmstr
 
     -- 迈速表（KMH）
     if #speedstr == 1 then -- 1位数 1-3位数的居中显示
@@ -75,14 +94,14 @@ function hud_0(speed,gear,rpm,relspeed)
     end
     monitor.setCursorPos(hud_scale / 2,(hud_scale / 2) - 1)
     monitor.write("KMH")
-
+    
     -- 转速表
     monitor.setCursorPos(1,(hud_scale / 2) + 2)
     monitor.write("-----------------------------------------------------------")
-    monitor.setCursorPos(((hud_scale / 2 - 5) - rpmstr*5) + 2,(hud_scale / 2) + 2)
-    monitor.write("+----+----+----+----+----+----+----+----+----+----+----+---------")
-    monitor.setCursorPos(((hud_scale / 2 - 5) - rpmstr*5) + 2,(hud_scale / 2) + 3)
-    monitor.write("     0    1    2    3    4    5    6    7    8    9   10         ")
+    monitor.setCursorPos(((hud_scale / 2 - 7) - rpmstr*5) + 2,(hud_scale / 2) + 2)
+    monitor.write("-----+----+----+----+----+----+----+----+----+----+----+----+----+----")
+    monitor.setCursorPos(((hud_scale / 2 - 7) - rpmstr*5) + 2,(hud_scale / 2) + 3)
+    monitor.write("     0    1    2    3    4    5    6    7    8    9   10   11   12")
     monitor.setCursorPos((hud_scale / 2) + 1,(hud_scale / 2) + 2)
     monitor.write("|")
 
@@ -95,28 +114,9 @@ function hud_0(speed,gear,rpm,relspeed)
     monitor.write("3 ")
     monitor.write("4 ")
     monitor.write("5")
-    if gear == -1 then
-        monitor.setCursorPos((hud_scale / 2) - 5,2)
-        monitor.write("=")
-    elseif gear == 0 then
-        monitor.setCursorPos((hud_scale / 2) - 3,2)
-        monitor.write("=")
-    elseif gear == 1 then
-        monitor.setCursorPos((hud_scale / 2) - 1,2)
-        monitor.write("=")
-    elseif gear == 2 then
-        monitor.setCursorPos((hud_scale / 2) + 1,2)
-        monitor.write("=")
-    elseif gear == 3 then
-        monitor.setCursorPos((hud_scale / 2) + 3,2)
-        monitor.write("=")
-    elseif gear == 4 then
-        monitor.setCursorPos((hud_scale / 2) + 5,2)
-        monitor.write("=")
-    elseif gear == 5 then
-        monitor.setCursorPos((hud_scale / 2) + 7,2)
-        monitor.write("=")
-    end
+    monitor.setCursorPos((gear + 1 ) * 2 + 2    ,2)
+    monitor.write("=")
+
    
     if gearbox_type == 1 then
 
@@ -132,11 +132,17 @@ function gearbox(gearbox_type)
         auto_sports()
     elseif gearbox_type == 1 then
         auto_snug()
+    elseif gearbox_type == 3 then
+        auto_overload()
     end
 end   
 
 -- 变速箱：AT运动模式
+
 function auto_sports()
+    mass = 0.6
+    acceleration = 3 -- 加速率
+    deceleration = 2 -- 减速率
     maxSpeed = 80 -- 最大引擎转速:8000RPM
     if speed < 2 then
         gear = 1
@@ -149,67 +155,40 @@ function auto_sports()
 end
 
 -- 变速箱：AT舒适模式
+
 function auto_snug()
+    mass = 0.45
+    acceleration = 2.3 -- 加速率
+    deceleration = 1.5 -- 减速率
     maxSpeed = 50 -- 最大引擎转速:5000RPM
     if speed < 2 then
         gear = 1
     end
-    if engine_speed > 30 then
+    if engine_speed > 40 then
         gear = math.min(gear + 1,5)
     elseif engine_speed < 10 then
         gear = math.max(gear -1,1)
     end  
 end
 
-
-
-
--- 主循环(有很多东西可以简化成funciton)
-while true do
-    local joy_y = joy.getAxis(2) -- 获取手柄左摇杆Y轴
-    local joy_rt = joy.getAxis(6) -- 获取手柄右扳机
-    local joy_lt = joy.getAxis(5) -- 获取手柄左扳机
-
-    local truespeed = ship.getVelocity() -- 获取速度分量
-    relspeed = math.sqrt(truespeed.x^2 + truespeed.z^2) -- 计算真实速度(m/s)
-
-    -- 引擎速度（轮速->齿轮比->引擎速度）
-    if gear == 1 then -- AT1档
-        load = 1.2 * mass -- 负载
-        engine_speed = speed / 1.7 -- 轮速
-    elseif gear == 2 then -- AT2档 *2
-        load = 2.0 * mass -- 负载
-        engine_speed = speed / (1.7 * 2)
-    elseif gear == 3 then -- AT3档 *3
-        load = 2.5 * mass -- 负载
-        engine_speed = speed / (1.7 * 3)
-    elseif gear == 4 then -- AT4档 *4
-        load = 3 * mass -- 负载
-        engine_speed = speed / (1.7 * 4)
-    elseif gear == 5 then -- AT5档 *5
-        load = 4.5 * mass -- 负载
-        engine_speed = speed / (1.7 * 5)
-    elseif gear == 0 then
-        load = 0 * mass -- 负载
-        engine_speed = engine_speed
-    elseif gear == -1 then -- 倒挡
-        if joy_y ~= -1  then -- 排除刹车
-            load = 1.2 * mass -- 负载
-            engine_speed = speed / -1.7 
-        end
+-- 变速箱：过载
+function auto_overload()
+    mass = 0.6
+    acceleration = 3 -- 加速率
+    deceleration = 2 -- 减速率
+    maxSpeed = 120 -- 最大引擎转速:8000RPM
+    if speed < 2 then
+        gear = 1
     end
+    if engine_speed > 100 then
+        gear = math.min(gear + 1,5)
+    elseif engine_speed < 30 then
+        gear = math.max(gear -1,1)
+    end  
+end    
 
-    -- 引擎油门（节气门）
-    if throttle > 0 then -- 加速
-        engine_speed = math.min((engine_speed + acceleration * throttle) - load, maxSpeed)  -- 加速
-        -- (引擎速度+加速率*油门开度)- 负载 小于最大速度
-    else -- 减速
-        engine_speed = math.max(engine_speed - deceleration, 2)  
-        -- 引擎速度-减速率 最小0rpm
-    end
-
-
-    -- 轮速度（引擎速度->齿轮比->轮速）
+-- 轮速度（引擎速度->齿轮比->轮速）
+function speed_ctl()
     if gear == 1 then -- AT1档
         speed = engine_speed * 1.7 -- 轮速
     elseif gear == 2 then -- AT2档 *2
@@ -237,7 +216,62 @@ while true do
     elseif gear == -1 then -- 倒挡
         speed = engine_speed * -1.7
     end
-    
+end
+
+-- 引擎速度（轮速->齿轮比->引擎速度）
+function engine_speed_ctl() 
+    if gear == 1 then -- AT1档
+        load = 1.2 * mass -- 负载
+        engine_speed = speed / 1.7 -- 轮速
+    elseif gear == 2 then -- AT2档 *2
+        load = 2.0 * mass -- 负载
+        engine_speed = speed / (1.7 * 2)
+    elseif gear == 3 then -- AT3档 *3
+        load = 2.5 * mass -- 负载
+        engine_speed = speed / (1.7 * 3)
+    elseif gear == 4 then -- AT4档 *4
+        load = 3 * mass -- 负载
+        engine_speed = speed / (1.7 * 4)
+    elseif gear == 5 then -- AT5档 *5
+        load = 4.5 * mass -- 负载
+        engine_speed = speed / (1.7 * 5)
+    elseif gear == 0 then
+        load = 0 * mass -- 负载
+        engine_speed = engine_speed
+    elseif gear == -1 then -- 倒挡
+        if joy_y ~= -1  then -- 排除刹车
+            load = 1.2 * mass -- 负载
+            engine_speed = speed / -1.7 
+        end
+    end
+end
+
+function engine_accelerator()
+    if throttle > 0 then -- 加速
+        engine_speed = math.min((engine_speed + acceleration * throttle) - load, maxSpeed)  -- 加速
+        -- (引擎速度+加速率*油门开度)- 负载 小于最大速度
+    else -- 减速
+        engine_speed = math.max(engine_speed - deceleration, 2)  
+        -- 引擎速度-减速率 最小0rpm
+    end
+end
+
+function main()
+        local joy_y = joy.getAxis(2) -- 获取手柄左摇杆Y轴
+    local joy_rt = joy.getAxis(6) -- 获取手柄右扳机
+    local joy_lt = joy.getAxis(5) -- 获取手柄左扳机
+
+    local truespeed = ship.getVelocity() -- 获取速度分量
+    relspeed = math.sqrt(truespeed.x^2 + truespeed.z^2) -- 计算真实速度(m/s)
+
+    -- 引擎速度（轮速->齿轮比->引擎速度）
+    engine_speed_ctl()
+    -- 引擎油门（节气门）
+    engine_accelerator()
+
+    -- 轮速度（引擎速度->齿轮比->轮速）
+    speed_ctl()
+
     speedcontroller.setTargetSpeed(speed) -- 这东西不放这会出问题=-=
 
     if relspeed < 0.3 then -- 如果真实速度小于0.3则自动空档
@@ -246,7 +280,7 @@ while true do
     
     if joy_y < 0 or joy_rt > 0.1 then -- 油门
         
-        if gear == -1 then
+        if gear == -1 and relspeed > 3 then
                 -- 倒车时的刹车按键
                 -- 引擎减速率=5
                 deceleration = 5
@@ -280,13 +314,21 @@ while true do
     elseif joy_y == 0 then -- 油门：空
         throttle = 0 -- 油门开度:0%
         maxSpeed = 80 -- 最大引擎转速:8000RPM
-
     end
+
     speedcontroller.setTargetSpeed(speed) -- 将轮速更改实施
     
     -- 模拟声浪
-    speaker.playNote("didgeridoo",(math.max(engine_speed / 26, 0.5)),(engine_speed / 5))
+    speaker.playNote("didgeridoo",(math.max(engine_speed / 26, 0.5)),(engine_speed / 8))
 
     -- hud渲染
     hud(speed,gear,rpm,relspeed)    
+end
+
+-- 主循环(有很多东西可以简化成funciton)
+while true do
+    startengine()
+    if startup == 0.9 then
+        main()
+    end
 end
