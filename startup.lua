@@ -1,10 +1,11 @@
--- startup.lua  版本2025/6/8 21:24
+-- startup.lua  版本2025/6/9 11:28
 -- 修改初始配置请第一次启动后查看config.lua
-ver = "-- 1.0" 
--- 配置文件版本请勿更改
+ver = 1.1 -- 配置文件版本请勿更改
+ 
+
 
 -- 配置文件
-configfile = "-- 1.0\n-- 配置文件版本请勿更改\n".."hud_type = 0 -- 为自定义hud做准备\nparking_brake = 1 -- 手刹\n-- 初始化变速箱\ngear = 0\nspeed = 0\ngearbox_type = 0\n-- 0 = MT\n-- 1 = auto_snug\n-- 2 = auto_sports\n-- 3 = auto_overload\n-- 初始化引擎\nengine_speed = 0 -- 启动转速\nmaxSpeed = 80 -- 最大转速（此处仅为启动时最大转速）\nacceleration = 3 -- 加速率（同上）\ndeceleration = 2 -- 减速率（同上）\nthrottle = 0.0 -- 油门\nload = 0 -- 负载(负载=车重*一个很迷的数？)\nmass = 0.6 -- 车重(负载基数)\nstartup = 1.6 -- 引擎启动参数 -1：待命 0.9：启动 1.6：执行启动动作\n-- 初始化其他参数\nrelspeed = 0 -- 真实速度（m/s）"
+configfile = "ConfigVer = 1.1\n-- 配置文件版本请勿更改\nhud_type = 0 -- 为自定义hud做准备\nparking_brake = 1 -- 手刹\n-- 初始化变速箱\ngear = 0\nspeed = 0\ngearbox_type = 0\n-- 0 = MT\n-- 1 = auto_snug\n-- 2 = auto_sports\n-- 3 = auto_overload\n-- 初始化引擎\nengine_speed = 0 -- 启动转速\nmaxSpeed = 80 -- 最大转速（此处仅为启动时最大转速）\nacceleration = 3 -- 加速率（同上）\ndeceleration = 2 -- 减速率（同上）\nthrottle = 0.0 -- 油门\nload = 0 -- 负载(负载=车重*一个很迷的数？)\nmass = 0.6 -- 车重(负载基数)\nstartup = 1.6 -- 引擎启动参数 -1：待命 0.9：启动 1.6：执行启动动作\n-- 初始化其他参数\nrelspeed = 0 -- 真实速度（m/s）\n\n-- 变速箱基数（齿轮比）引擎速度 * 基数 = 轮速\ngearr = -1\ngearn = 0\ngear1 = 1\ngear2 = 2\ngear3 = 3\ngear4 = 4\ngear5 = 5"
 
 
 --- 初始化
@@ -24,18 +25,24 @@ local hud_scale = monitor.getSize()
 -- 配置文件
 local config = io.open("config.lua","r")
 if config then
+    -- 打开配置文件
     io.input(config)
-    configVer = (io.read())
-    print("ConfigVer:"..configVer)
-    if configVer ~= ver then
-        monitor.setCursorPos(1,1)
+    -- 执行配置文件
+    dofile("config.lua")
+    
+    if ConfigVer then
+    monitor.setCursorPos(1,1)
+    monitor.write("ConfigVer:"..ConfigVer.."  ProgramVer:"..ver)
+    end
+    if ConfigVer ~= ver or not ConfigVer then
+        monitor.setCursorPos(1,2)
         monitor.write("updConfig")
         os.sleep(0.1)
         local config = io.open("config.lua","w")
         io.output(config)
         io.write(configfile)
         io.close(config)
-        monitor.setCursorPos(1,2)
+        monitor.setCursorPos(1,3)
         monitor.write("reboot...")
         os.sleep(1)
         os.reboot()
@@ -44,7 +51,7 @@ if config then
     monitor.write("configOK")
     monitor.setCursorPos(1,1)
     monitor.write(config)
-    dofile("config.lua")
+    
     io.close(config)
 else
     monitor.setCursorPos(1,1)
@@ -259,15 +266,15 @@ end
 -- 轮速度（引擎速度->齿轮比->轮速）
 function speed_ctl()
     if gear == 1 then -- AT1档
-        speed = engine_speed * 1.7 -- 轮速
+        speed = engine_speed * gear1 -- 轮速
     elseif gear == 2 then -- AT2档 *2
-        speed = engine_speed * (1.7 * 2)
+        speed = engine_speed * gear2
     elseif gear == 3 then -- AT3档 *3
-        speed = engine_speed * (1.7 * 3)
+        speed = engine_speed * gear3
     elseif gear == 4 then -- AT4档 *4
-        speed = engine_speed * (1.7 * 4)
+        speed = engine_speed * gear4
     elseif gear == 5 then -- AT5档 *5
-        speed = engine_speed * (1.7 * 5)
+        speed = engine_speed * gear5
     elseif gear == 0 then -- 空档(模拟惯性)
         if relspeed < 2 then -- 模拟惯性停车 
             speed = 0
@@ -283,7 +290,7 @@ function speed_ctl()
             speed = 204.8
         end
     elseif gear == -1 then -- 倒挡
-        speed = engine_speed * -1.7
+        speed = engine_speed * gearr
     end
 end
 
@@ -291,26 +298,26 @@ end
 function engine_speed_ctl() 
     if gear == 1 then -- AT1档
         load = 1.2 * mass -- 负载
-        engine_speed = speed / 1.7 -- 轮速
+        engine_speed = speed / gear1
     elseif gear == 2 then -- AT2档 *2
         load = 2.0 * mass -- 负载
-        engine_speed = speed / (1.7 * 2)
+        engine_speed = speed / gear2
     elseif gear == 3 then -- AT3档 *3
         load = 2.5 * mass -- 负载
-        engine_speed = speed / (1.7 * 3)
+        engine_speed = speed / gear3
     elseif gear == 4 then -- AT4档 *4
         load = 3 * mass -- 负载
-        engine_speed = speed / (1.7 * 4)
+        engine_speed = speed / gear4
     elseif gear == 5 then -- AT5档 *5
         load = 4.5 * mass -- 负载
-        engine_speed = speed / (1.7 * 5)
+        engine_speed = speed /gear5
     elseif gear == 0 then
         load = 0 * mass -- 负载
         engine_speed = engine_speed
     elseif gear == -1 then -- 倒挡
         if joy_y ~= -1  then -- 排除刹车
             load = 1.2 * mass -- 负载
-            engine_speed = speed / -1.7 
+            engine_speed = speed / gearr
         end
     end
 end
@@ -423,7 +430,7 @@ function main()
                 gearbox_type = 0
             end
         end
-        os.sleep(0.5)
+        os.sleep(0.2)
     end
     
     
@@ -436,7 +443,7 @@ function main()
         else
             parking_brake = 1
         end
-        os.sleep(0.05)
+        os.sleep(0.1)
     end
 
     if parking_brake == 1 then
@@ -444,15 +451,19 @@ function main()
 
     end
 
-    -- 引擎速度（轮速->齿轮比->引擎速度）
+    
     if gearbox_type ~= 0 then
-        engine_speed_ctl()
-
+        if parking_brake == 0 then
+            -- 引擎速度（轮速->齿轮比->引擎速度）
+            engine_speed_ctl()
+        end
         -- 引擎油门（节气门）
         engine_accelerator()
 
+        if parking_brake == 0 then
         -- 轮速度（引擎速度->齿轮比->轮速）
         speed_ctl()
+        end
     end
 
     speedcontroller.setTargetSpeed(speed) -- 这东西不放这会出问题=-=
